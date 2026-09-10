@@ -4,15 +4,22 @@ FROM debian:trixie-slim AS builder
 ARG VERSION=23.3.4
 ARG TARGETPLATFORM
 
+ENV BYRON_PGP_KEY=710E44C2DAAE938F778744A1DE8F6EA20A661697
+ENV PABLO_PGP_KEY=BD0F3062F87842410B06A0432F656B0610604482
+
 RUN set -ex \
   && if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then export TARGETPLATFORM=x86_64-linux-gnu; fi \
   && if [ "${TARGETPLATFORM}" = "linux/arm64" ]; then export TARGETPLATFORM=aarch64-linux-gnu; fi \
 	&& apt-get update \
-	&& apt-get install -qq --no-install-recommends ca-certificates wget \
+	&& apt-get install -qq --no-install-recommends ca-certificates wget gnupg \
 	&& cd /tmp \
-	&& wget -qO elements.tar.gz "https://github.com/ElementsProject/elements/releases/download/elements-$VERSION/elements-$VERSION-$TARGETPLATFORM.tar.gz" \
+	&& wget -q "https://github.com/ElementsProject/elements/releases/download/elements-$VERSION/elements-$VERSION-$TARGETPLATFORM.tar.gz" \
+	&& wget -qO SHA256SUMS.asc "https://github.com/ElementsProject/elements/releases/download/elements-$VERSION/SHA256SUMS.asc" \
+	&& gpg --keyserver hkps://keys.openpgp.org --recv-keys "$BYRON_PGP_KEY" "$PABLO_PGP_KEY" \
+	&& gpg --output SHA256SUMS --decrypt SHA256SUMS.asc \
+	&& grep "elements-$VERSION-$TARGETPLATFORM.tar.gz" SHA256SUMS | sha256sum -c \
 	&& mkdir bin \
-	&& tar -xzvf elements.tar.gz -C /tmp/bin --strip-components=2 "elements-$VERSION/bin/elements-cli" "elements-$VERSION/bin/elementsd"
+	&& tar -xzvf "elements-$VERSION-$TARGETPLATFORM.tar.gz" -C /tmp/bin --strip-components=2 "elements-$VERSION/bin/elements-cli" "elements-$VERSION/bin/elementsd"
 
 FROM debian:trixie-slim
 
